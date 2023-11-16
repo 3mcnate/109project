@@ -9,13 +9,14 @@
 
 extern volatile uint8_t new_state, old_state;
 extern volatile char encoder_changed; // Flag for state change
-extern volatile char diff;
 extern volatile char button_changed;
 
 extern volatile char THRESHOLD_SELECT;
 
-extern enum
-{
+extern volatile uint8_t high_thresh;
+extern volatile uint8_t low_thresh;
+
+extern enum {
     NORMAL,
     LOW,
     HIGH,
@@ -34,6 +35,8 @@ ISR(PCINT1_vect)
     // convert a and b to 1 or 0
     a = (a >> PC1);
     b = (b >> PC2);
+
+    char diff = 0;
 
     // The following code is for Tasks 4 and later.
     // For each state, examine the two input bits to see if state
@@ -105,6 +108,14 @@ ISR(PCINT1_vect)
     {
         encoder_changed = 1;
         old_state = new_state;
+
+        // update values
+        if (THRESHOLD_SELECT == LOW) {
+            low_thresh += diff;
+        }
+        else {
+            high_thresh += diff;
+        }
     }
 }
 

@@ -4,6 +4,8 @@
 
 #include <avr/io.h>
 #include <util/delay.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 #include "lcd.h" // Declarations of the LCD functions
 
@@ -130,4 +132,34 @@ void lcd_errormsg(char* str) {
   lcd_writecommand(1);
   lcd_moveto(0,0);
   lcd_stringout(str);
+  _delay_ms(500);
+}
+
+/**
+ * Writes new threshold values val to the screen in designated column col, row 1.
+ */
+void lcd_write_thresh_val(uint8_t val, char col)
+{
+    char buf[4];
+    snprintf(buf, 4, "%d", val);
+    lcd_moveto(1, col);
+    lcd_stringout(buf);
+}
+
+/**
+ * Writes '?' to designated column col in row 1
+ */
+void lcd_write_qmark(char col)
+{
+    lcd_moveto(1, col);
+    lcd_stringout("?");
+}
+
+/**
+ * Writes '=' to designated column col in row 1
+ */
+void lcd_write_equals(char col)
+{
+    lcd_moveto(1, col);
+    lcd_stringout("=");
 }

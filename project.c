@@ -22,7 +22,6 @@ enum
 
 volatile uint8_t new_state, old_state;
 volatile char encoder_changed = 0; // Flag for state change
-volatile char diff = 0;
 volatile char button_changed = 0;
 
 char STATE;
@@ -31,10 +30,7 @@ volatile uint8_t high_thresh;
 volatile uint8_t low_thresh;
 
 int get_temp_F(void);
-void check_bounds(uint8_t *val);
-void lcd_write_thresh_val(uint8_t val, char col);
-void lcd_write_qmark(char col);
-void lcd_write_equals(char col);
+void check_bounds(volatile uint8_t *val);
 void change_state(int8_t temp);
 
 int main()
@@ -141,43 +137,24 @@ int main()
      */
     while (1)
     {
-
-        // check if buttons are pressed
-        if (button_changed == 1)
-        {
-            button_changed = 0;
-            if (THRESHOLD_SELECT == LOW) {
-                lcd_write_equals(12);
-                lcd_write_qmark(3);
-            }
-            else {
-                lcd_write_equals(3);
-                lcd_write_qmark(12);
-            }
-        }
-        
         // check rotary encoder changes
         if (encoder_changed == 1)
         {
             encoder_changed = 0;
 
-            if (THRESHOLD_SELECT == LOW)
-            {
-                low_thresh += diff;
-            }
-            else
-            {
-                high_thresh += diff;
-            }
-
             // check bounds of threshholds
             check_bounds(&low_thresh);
             check_bounds(&high_thresh);
 
-            if (low_thresh > high_thresh)
+            if (THRESHOLD_SELECT == LOW && low_thresh > high_thresh)
             {
                 low_thresh = high_thresh;
+                // SOUND BUZZER
+            }
+            if (THRESHOLD_SELECT == HIGH && high_thresh < low_thresh)
+            {
                 high_thresh = low_thresh;
+                // SOUND BUZZER
             }
 
             // write value to screen
@@ -189,8 +166,6 @@ int main()
             {
                 lcd_write_thresh_val(high_thresh, 14);
             }
-
-            continue;
         }
 
         // read temperature
@@ -282,7 +257,7 @@ int get_temp_F(void)
 /**
  * Checks and adjusts (if necessary) bounds of threshold at location val
  */
-void check_bounds(uint8_t *val)
+void check_bounds(volatile uint8_t *val)
 {
     if (*val < 50)
     {
@@ -292,35 +267,6 @@ void check_bounds(uint8_t *val)
     {
         *val = 90;
     }
-}
-
-/**
- * Writes new threshold values val to the screen in designated column col, row 1.
- */
-void lcd_write_thresh_val(uint8_t val, char col)
-{
-    char buf[4];
-    snprintf(buf, 4, "%d", val);
-    lcd_moveto(1, col);
-    lcd_stringout(buf);
-}
-
-/**
- * Writes '?' to designated column col in row 1
- */
-void lcd_write_qmark(char col)
-{
-    lcd_moveto(1, col);
-    lcd_stringout("?");
-}
-
-/**
- * Writes '=' to designated column col in row 1
- */
-void lcd_write_equals(char col)
-{
-    lcd_moveto(1, col);
-    lcd_stringout("=");
 }
 
 /**
