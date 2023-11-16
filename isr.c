@@ -12,7 +12,6 @@ extern volatile char encoder_changed; // Flag for state change
 extern volatile char button_changed;
 
 extern volatile char THRESHOLD_SELECT;
-
 extern volatile uint8_t high_thresh;
 extern volatile uint8_t low_thresh;
 

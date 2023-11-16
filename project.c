@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <avr/interrupt.h>
+#include <avr/eeprom.h>
 
 #include "lcd.h"
 #include "ds18b20.h"
@@ -10,6 +11,9 @@
 #define RED PC3
 #define GREEN PC4
 #define BLUE PC5
+
+#define LOW_THRESH_EEPROM_LOC 0
+#define HIGH_THRESH_EEPROM_LOC 1
 
 enum
 {
@@ -24,10 +28,11 @@ volatile uint8_t new_state, old_state;
 volatile char encoder_changed = 0; // Flag for state change
 volatile char button_changed = 0;
 
-char STATE;
 volatile char THRESHOLD_SELECT;
 volatile uint8_t high_thresh;
 volatile uint8_t low_thresh;
+
+char STATE;
 
 int get_temp_F(void);
 void check_bounds(volatile uint8_t *val);
@@ -85,9 +90,13 @@ int main()
 
     THRESHOLD_SELECT = LOW;
 
-    // CHANGE TO USE EEPROM
-    low_thresh = 60;
-    high_thresh = 80;
+    // try to read EEPROM
+    low_thresh = eeprom_read_byte((void*) LOW_THRESH_EEPROM_LOC);
+    high_thresh = eeprom_read_byte((void*) HIGH_THRESH_EEPROM_LOC);
+
+    // make values valid
+    check_bounds(&low_thresh);
+    check_bounds(&high_thresh);
 
     // set initial TEMP_STATE
     int initial_temp = get_temp_F();
@@ -157,14 +166,16 @@ int main()
                 // SOUND BUZZER
             }
 
-            // write value to screen
+            // write value to screen and EEPROM
             if (THRESHOLD_SELECT == LOW)
             {
                 lcd_write_thresh_val(low_thresh, 5);
+                eeprom_update_byte((void*) LOW_THRESH_EEPROM_LOC, low_thresh);
             }
             else
             {
                 lcd_write_thresh_val(high_thresh, 14);
+                eeprom_update_byte((void*) HIGH_THRESH_EEPROM_LOC, high_thresh);
             }
         }
 
@@ -214,18 +225,6 @@ int main()
             old_temp = temp;
         }
     }
-
-    // int temp_F_16 = get_temp_F(temp_result);
-    // int num = temp_F_16 >> 4;
-    // int dec = ((temp_F_16 % 16) * 10) / 16;
-
-    // snprintf(buf, 32, "0x%02x%02x = %d.%d", temp_result[1], temp_result[0], num, dec);
-    // lcd_writecommand(1);
-    // lcd_moveto(0, 0);
-    // lcd_stringout(buf);
-
-    // ds_convert(); // Start next conversion
-
     return 0;
 }
 /**
@@ -274,26 +273,26 @@ void check_bounds(volatile uint8_t *val)
  */
 void change_state(int8_t temp)
 {
-    if (low_thresh <= temp && temp <= high_thresh)
+    if (low_thresh <= temp && temp < high_thresh)
     {
         STATE = NORMAL;
+    }
+    else if (low_thresh - 3 < temp && temp <= low_thresh)
+    {
+        STATE = LOW;
+    }
+    else if (high_thresh <= temp && temp < high_thresh + 3)
+    {
+        STATE = HIGH;
     }
     else if (temp < low_thresh - 3 && STATE != BELOW_3)
     {
         STATE = BELOW_3;
         // SOUND BUZZER
     }
-    else if (low_thresh - 3 <= temp && temp < low_thresh)
-    {
-        STATE = LOW;
-    }
     else if (temp > high_thresh + 3 && STATE != ABOVE_3)
     {
         STATE = ABOVE_3;
         // SOUND BUZZER
-    }
-    else if (high_thresh < temp && temp <= high_thresh + 3)
-    {
-        STATE = HIGH;
     }
 }
