@@ -7,6 +7,7 @@
 
 #include "lcd.h"
 #include "ds18b20.h"
+#include "buzzer.h"
 
 #define RED PC3
 #define GREEN PC4
@@ -46,7 +47,7 @@ int main()
     // initialize encoder pull-ups
     PORTC |= ((1 << PC1) | (1 << PC2));
 
-    // set econder pin change interrupts (Port C)
+    // set ENCODER pin change interrupts (Port C)
     PCICR |= (1 << PCIE1);
     PCMSK1 |= (1 << PCINT9) | (1 << PCINT10);
 
@@ -56,6 +57,9 @@ int main()
 
     // set LED bits to output
     DDRC |= (1 << RED) | (1 << GREEN) | (1 << BLUE);
+
+    // set buzzer bit to output
+    DDRB |= (1 << PB5);
 
     // system enable interrupts
     sei();
@@ -71,6 +75,9 @@ int main()
         while (1)
             ; // stop
     }
+
+    // initialize timer0 for buzzer
+    timer0_init();
 
     // initialize state of rotary encoder
     uint8_t x = PINC;
@@ -159,11 +166,13 @@ int main()
             {
                 low_thresh = high_thresh;
                 // SOUND BUZZER
+                play_note();
             }
             if (THRESHOLD_SELECT == HIGH && high_thresh < low_thresh)
             {
                 high_thresh = low_thresh;
                 // SOUND BUZZER
+                play_note();
             }
 
             // write value to screen and EEPROM
@@ -289,10 +298,12 @@ void change_state(int8_t temp)
     {
         STATE = BELOW_3;
         // SOUND BUZZER
+        play_note();
     }
     else if (temp > high_thresh + 3 && STATE != ABOVE_3)
     {
         STATE = ABOVE_3;
         // SOUND BUZZER
+        play_note();
     }
 }
