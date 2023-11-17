@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <avr/interrupt.h>
 
-#define TIMER_MAX_COUNT 523
+#define TIMER_MAX_COUNT 523 // half second tone
 volatile int timer_count = 0;
 
 void timer0_init(void)

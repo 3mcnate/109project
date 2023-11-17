@@ -8,6 +8,7 @@
 #include "lcd.h"
 #include "ds18b20.h"
 #include "buzzer.h"
+#include "servo.h"
 
 #define RED PC3
 #define GREEN PC4
@@ -15,6 +16,11 @@
 
 #define LOW_THRESH_EEPROM_LOC 0
 #define HIGH_THRESH_EEPROM_LOC 1
+
+int get_16_temp_F(void);
+void check_bounds(volatile uint8_t *val);
+void change_state(int8_t temp);
+uint8_t get_rounded_temp_F(int temp);
 
 enum
 {
@@ -34,10 +40,6 @@ volatile uint8_t high_thresh;
 volatile uint8_t low_thresh;
 
 char STATE;
-
-int get_temp_F(void);
-void check_bounds(volatile uint8_t *val);
-void change_state(int8_t temp);
 
 int main()
 {
@@ -61,6 +63,9 @@ int main()
     // set buzzer bit to output
     DDRB |= (1 << PB5);
 
+    // set servo bit to output
+    DDRB |= (1 << PB3);
+    
     // system enable interrupts
     sei();
 
@@ -72,8 +77,7 @@ int main()
     {
         // Sensor not responding
         lcd_errormsg("DSinit no resp");
-        while (1)
-            ; // stop
+        while (1); // stop
     }
 
     // initialize timer0 for buzzer
@@ -106,7 +110,7 @@ int main()
     check_bounds(&high_thresh);
 
     // set initial TEMP_STATE
-    int initial_temp = get_temp_F();
+    int initial_temp = get_16_temp_F();
     int old_temp = initial_temp;
 
     if ((initial_temp / 16) < low_thresh)
@@ -147,6 +151,9 @@ int main()
     lcd_moveto(1, 8);
     lcd_stringout("High= ");
     lcd_write_thresh_val(high_thresh, 14);
+
+    // initialize servo
+    servo_init(get_rounded_temp_F(initial_temp));
 
     /**
      * MAIN PROGRAM LOOP
@@ -189,10 +196,10 @@ int main()
         }
 
         // read temperature
-        int temp = get_temp_F();
+        int temp = get_16_temp_F();
 
         // performs next state transition logic based on current temp reading
-        change_state(temp / 16);
+        change_state(get_rounded_temp_F(temp));
 
         // state output logic for LEDs
         if (STATE == LOW || STATE == BELOW_3)
@@ -220,7 +227,7 @@ int main()
         // check if temperature has changed and writes new value to display/servo if needed
         if (temp != old_temp)
         {
-
+            
             int num = temp / 16;
             int dec = ((temp % 16) * 10) / 16;
 
@@ -230,6 +237,7 @@ int main()
             lcd_stringout(buf);
 
             // DISPLAY TO SERVO
+            update_servo(get_rounded_temp_F(temp));
 
             old_temp = temp;
         }
@@ -239,7 +247,7 @@ int main()
 /**
  * @return temperature in farenheit times 16 (must divide by 16 to get actual value)
  */
-int get_temp_F(void)
+int get_16_temp_F(void)
 {
     // start conversion
     ds_convert();
@@ -260,6 +268,19 @@ int get_temp_F(void)
             return value;
         }
     }
+}
+
+/**
+ * @brief returns temperature rounded to the nearest integer
+ * @param[in] temp temperature in Farenheit, times 16
+*/
+uint8_t get_rounded_temp_F(int temp) 
+{
+    uint8_t val = temp / 16;
+    if (temp % 16 >= 8) {
+        val++;
+    } 
+    return val;
 }
 
 /**
