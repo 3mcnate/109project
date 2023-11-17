@@ -7,6 +7,9 @@
 
 #include "servo.h"
 
+#define OCR2A_MAX 35
+#define OCR2A_MIN 12
+
 void servo_init(uint8_t init_temp)
 {
     TCCR2A |= ((1 << WGM21) | (1 << WGM20));
@@ -18,25 +21,30 @@ void servo_init(uint8_t init_temp)
     TCCR2B |= (0b111 << CS20);
 }
 
-void update_servo(uint8_t temp) {
+void update_servo(uint8_t temp)
+{
     calc_OCR2A(temp);
 }
 
 /**
  * @brief sets OCR2A value for PWM pulse width based on temperature
-*/
-void calc_OCR2A(uint8_t temp) {
+ */
+void calc_OCR2A(uint8_t temp)
+{
     // for 0.75ms: OCR2A = 12
     // for 2.25ms: OCR2A = 35
-    int t = (((temp - 40) * 23) / 60) + 12;
+    int t = (((40 - temp) * (OCR2A_MAX - OCR2A_MIN)) / 60) + OCR2A_MAX;
 
-    if (t < 12) {
-        OCR2A = 12;
+    if (t < OCR2A_MIN)
+    {
+        OCR2A = OCR2A_MIN;
     }
-    else if (t > 35) {
-        OCR2A = 35;
+    else if (t > OCR2A_MAX)
+    {
+        OCR2A = OCR2A_MAX;
     }
-    else {
+    else
+    {
         OCR2A = t;
     }
-} 
+}

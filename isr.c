@@ -6,6 +6,8 @@
 
 #include "lcd.h"
 #include "ds18b20.h"
+#include "servo.h"
+#include "timer.h"
 
 extern volatile uint8_t new_state, old_state;
 extern volatile char encoder_changed; // Flag for state change
@@ -14,6 +16,8 @@ extern volatile char button_changed;
 extern volatile char THRESHOLD_SELECT;
 extern volatile uint8_t high_thresh;
 extern volatile uint8_t low_thresh;
+
+extern volatile char timer1_running;
 
 extern enum {
     NORMAL,
@@ -115,6 +119,16 @@ ISR(PCINT1_vect)
         else {
             high_thresh += diff;
         }
+
+        // update servo if needed
+        if (timer1_running) {
+            if (THRESHOLD_SELECT == LOW) {
+                update_servo(low_thresh);
+            }
+            else {
+                update_servo(high_thresh);
+            }
+        }
     }
 }
 
@@ -131,12 +145,16 @@ ISR(PCINT2_vect)
         THRESHOLD_SELECT = LOW;
         lcd_write_equals(12);
         lcd_write_qmark(3);
+        timer1_start();
+        update_servo(low_thresh);
     }
     if (high_button == 0)
     {
         THRESHOLD_SELECT = HIGH;
         lcd_write_equals(3);
         lcd_write_qmark(12);
+        timer1_start();
+        update_servo(high_thresh);
     }
 
     button_changed = 1;

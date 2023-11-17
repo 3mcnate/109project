@@ -9,6 +9,7 @@
 #include "ds18b20.h"
 #include "buzzer.h"
 #include "servo.h"
+#include "timer.h"
 
 #define RED PC3
 #define GREEN PC4
@@ -17,10 +18,10 @@
 #define LOW_THRESH_EEPROM_LOC 0
 #define HIGH_THRESH_EEPROM_LOC 1
 
-int get_16_temp_F(void);
+int get_temp_F_16(void);
+uint8_t get_rounded_temp_F(int temp);
 void check_bounds(volatile uint8_t *val);
 void change_state(int8_t temp);
-uint8_t get_rounded_temp_F(int temp);
 
 enum
 {
@@ -40,6 +41,8 @@ volatile uint8_t high_thresh;
 volatile uint8_t low_thresh;
 
 char STATE;
+volatile int current_temp_16;
+extern volatile char timer1_running;
 
 int main()
 {
@@ -65,7 +68,7 @@ int main()
 
     // set servo bit to output
     DDRB |= (1 << PB3);
-    
+
     // system enable interrupts
     sei();
 
@@ -77,11 +80,15 @@ int main()
     {
         // Sensor not responding
         lcd_errormsg("DSinit no resp");
-        while (1); // stop
+        while (1)
+            ; // stop
     }
 
     // initialize timer0 for buzzer
     timer0_init();
+
+    // initialize timer1 for 4 second indicator dial
+    timer1_init();
 
     // initialize state of rotary encoder
     uint8_t x = PINC;
@@ -102,37 +109,40 @@ int main()
     THRESHOLD_SELECT = LOW;
 
     // try to read EEPROM
-    low_thresh = eeprom_read_byte((void*) LOW_THRESH_EEPROM_LOC);
-    high_thresh = eeprom_read_byte((void*) HIGH_THRESH_EEPROM_LOC);
+    low_thresh = eeprom_read_byte((void *)LOW_THRESH_EEPROM_LOC);
+    high_thresh = eeprom_read_byte((void *)HIGH_THRESH_EEPROM_LOC);
 
     // make values valid
     check_bounds(&low_thresh);
     check_bounds(&high_thresh);
 
     // set initial TEMP_STATE
-    int initial_temp = get_16_temp_F();
-    int old_temp = initial_temp;
+    current_temp_16 = get_temp_F_16();
+    int old_temp = -1;
 
-    if ((initial_temp / 16) < low_thresh)
-    {
-        STATE = LOW;
-        if ((initial_temp / 16) < low_thresh - 3)
-        {
-            STATE = BELOW_3;
-        }
-    }
-    else if ((initial_temp / 16) > high_thresh)
-    {
-        STATE = HIGH;
-        if ((initial_temp / 16) > high_thresh + 3)
-        {
-            STATE = ABOVE_3;
-        }
-    }
-    else
-    {
-        STATE = NORMAL;
-    }
+    // if ((current_temp_16 / 16) < low_thresh)
+    // {
+    //     STATE = LOW;
+    //     if ((current_temp_16 / 16) < low_thresh - 3)
+    //     {
+    //         STATE = BELOW_3;
+    //     }
+    // }
+    // else if ((current_temp_16 / 16) > high_thresh)
+    // {
+    //     STATE = HIGH;
+    //     if ((current_temp_16 / 16) > high_thresh + 3)
+    //     {
+    //         STATE = ABOVE_3;
+    //     }
+    // }
+    // else
+    // {
+    //     STATE = NORMAL;
+    // }
+
+    // get initial state
+    change_state(get_rounded_temp_F(current_temp_16));
 
     // write splash screen
     lcd_writecommand(1);
@@ -153,7 +163,7 @@ int main()
     lcd_write_thresh_val(high_thresh, 14);
 
     // initialize servo
-    servo_init(get_rounded_temp_F(initial_temp));
+    servo_init(get_rounded_temp_F(current_temp_16));
 
     /**
      * MAIN PROGRAM LOOP
@@ -186,20 +196,20 @@ int main()
             if (THRESHOLD_SELECT == LOW)
             {
                 lcd_write_thresh_val(low_thresh, 5);
-                eeprom_update_byte((void*) LOW_THRESH_EEPROM_LOC, low_thresh);
+                eeprom_update_byte((void *)LOW_THRESH_EEPROM_LOC, low_thresh);
             }
             else
             {
                 lcd_write_thresh_val(high_thresh, 14);
-                eeprom_update_byte((void*) HIGH_THRESH_EEPROM_LOC, high_thresh);
+                eeprom_update_byte((void *)HIGH_THRESH_EEPROM_LOC, high_thresh);
             }
         }
 
         // read temperature
-        int temp = get_16_temp_F();
+        current_temp_16 = get_temp_F_16();
 
         // performs next state transition logic based on current temp reading
-        change_state(get_rounded_temp_F(temp));
+        change_state(get_rounded_temp_F(current_temp_16));
 
         // state output logic for LEDs
         if (STATE == LOW || STATE == BELOW_3)
@@ -225,62 +235,26 @@ int main()
         }
 
         // check if temperature has changed and writes new value to display/servo if needed
-        if (temp != old_temp)
+        if (current_temp_16 != old_temp)
         {
-            
-            int num = temp / 16;
-            int dec = ((temp % 16) * 10) / 16;
+
+            int num = current_temp_16 / 16;
+            int dec = ((current_temp_16 % 16) * 10) / 16;
 
             char buf[9];
             snprintf(buf, 9, "%d.%d", num, dec);
             lcd_moveto(0, 7);
             lcd_stringout(buf);
 
-            // DISPLAY TO SERVO
-            update_servo(get_rounded_temp_F(temp));
+            // DISPLAY TO SERVO IF NOT IN THRESHOLD SELECT MODE
+            if (!timer1_running) {
+                update_servo(get_rounded_temp_F(current_temp_16));
+            }
 
-            old_temp = temp;
+            old_temp = current_temp_16;
         }
     }
     return 0;
-}
-/**
- * @return temperature in farenheit times 16 (must divide by 16 to get actual value)
- */
-int get_16_temp_F(void)
-{
-    // start conversion
-    ds_convert();
-
-    unsigned char t[2];
-
-    while (1)
-    {
-
-        if (ds_temp(t))
-        { // True if conversion complete
-            // value is scaled by 16.
-            int16_t value = t[1];
-            value = value << 8;
-            value |= t[0];
-
-            value = (value * 9) / 5 + 16 * 32;
-            return value;
-        }
-    }
-}
-
-/**
- * @brief returns temperature rounded to the nearest integer
- * @param[in] temp temperature in Farenheit, times 16
-*/
-uint8_t get_rounded_temp_F(int temp) 
-{
-    uint8_t val = temp / 16;
-    if (temp % 16 >= 8) {
-        val++;
-    } 
-    return val;
 }
 
 /**
