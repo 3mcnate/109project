@@ -10,10 +10,25 @@ total **cost per unit** (again assume we build a quantity of 1000 units) for
 these thermostats.  Itemize the part costs (list each part and its unit cost
 when bought in units of 1000) and then show the final cost per unit below.
 Note: You only need to price the components used in the project (not all the
-components in your lab kit.  Also, you do not need to account for the cost of
+components in your lab kit).  Also, you do not need to account for the cost of
 the circuit board or wires. In a real environment we would manufacture a PCB
 (Printed Circuit Board). As an optional task, you can search online for PCB
 manufacturers and what the costs and options are in creating a PCB.
+
+Item                    Unit price @ 1000 units
+Arduino Uno             25.95
+LCD Display             8.90
+Button (x2)             3.16 = 1.58 x 2
+Rotary encoder          2.43723
+Rotary encoder knob     0.89          
+Buzzer                  0.47797
+RGB LED                 0.0899
+Temperature Sensor      4.16
+1.3 kOhm resistor       0.01144
+4.7 kOhm resistor       0.01144
+Servo motor             5.95
+
+Total price per unit:   $52.04
 
 
 Review Question 2 (Health/Safety/Reliability)
@@ -25,7 +40,13 @@ Considering reliability, health, and safety...
  - What scenarios might you suggest testing (considering both HW and SW) 
     before releasing the product for use? 
 
-
+   I would consider testing how the thermostat responds to extreme temperatures
+   (high and low), especially if it is controlling heat/AC, since this could affect the 
+   safety of the occupants of the building. I would also test what happens
+   if the temperature sensor becomes disconnected or damaged and see if the thermostat
+   handles that gracefully. Additionally, if the consumer is relying on the buzzer to
+   alert them to an issue in the home, I would test this functionality extensively
+   to make sure it works properly and is reliable. 
 
 
  - How might you make your design more reliable? By reliability we don't just
@@ -35,7 +56,16 @@ Considering reliability, health, and safety...
    issues related to the operational environment, etc. and how to mitigate
    those cases.
 
+   To mitigate failure of the temperature sensor, I would implement checks to make sure 
+   that the temperature read from the sensor is within reasonable bounds (e.g. 0 < temp < 120).
+   If it's consistently out of bounds, I would use the buzzer or LED to signal to the consumer
+   that there is an issue with the thermostat. 
 
+   If this product was actually connected to a heating/AC system, I would implement
+   functionality to communicate with said system to make sure it is heating/cooling properly.
+
+   In terms of HW, I would make sure all the I/O connections are much more secure,
+   because I ran into issues with wires coming unplugged. 
 
 
 

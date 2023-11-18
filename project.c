@@ -10,6 +10,7 @@
 #include "buzzer.h"
 #include "servo.h"
 #include "timer.h"
+#include "temp.h"
 
 #define RED PC3
 #define GREEN PC4
@@ -18,9 +19,6 @@
 #define LOW_THRESH_EEPROM_LOC 0
 #define HIGH_THRESH_EEPROM_LOC 1
 
-int get_temp_F_16(void);
-uint8_t get_rounded_temp_F(int temp);
-void check_bounds(volatile uint8_t *val);
 void change_state(int8_t temp);
 
 enum
@@ -118,7 +116,7 @@ int main()
 
     // set initial TEMP_STATE
     current_temp_16 = get_temp_F_16();
-    int old_temp = -1;
+    int old_temp_16 = -1;
 
     // if ((current_temp_16 / 16) < low_thresh)
     // {
@@ -175,21 +173,14 @@ int main()
         {
             encoder_changed = 0;
 
-            // check bounds of threshholds
-            check_bounds(&low_thresh);
-            check_bounds(&high_thresh);
-
+            // check high isn't less than low and vice versa
             if (THRESHOLD_SELECT == LOW && low_thresh > high_thresh)
             {
                 low_thresh = high_thresh;
-                // SOUND BUZZER
-                play_note();
             }
             if (THRESHOLD_SELECT == HIGH && high_thresh < low_thresh)
             {
                 high_thresh = low_thresh;
-                // SOUND BUZZER
-                play_note();
             }
 
             // write value to screen and EEPROM
@@ -208,8 +199,14 @@ int main()
         // read temperature
         current_temp_16 = get_temp_F_16();
 
+        // ignore extraneous temperature results caused from loose connections
+        int rounded_temp = get_rounded_temp_F(current_temp_16);
+        if (rounded_temp > 120 || rounded_temp < 0) {
+            continue;
+        }
+
         // performs next state transition logic based on current temp reading
-        change_state(get_rounded_temp_F(current_temp_16));
+        change_state(rounded_temp);
 
         // state output logic for LEDs
         if (STATE == LOW || STATE == BELOW_3)
@@ -235,14 +232,14 @@ int main()
         }
 
         // check if temperature has changed and writes new value to display/servo if needed
-        if (current_temp_16 != old_temp)
+        if (current_temp_16 != old_temp_16)
         {
 
             int num = current_temp_16 / 16;
-            int dec = ((current_temp_16 % 16) * 10) / 16;
+            int dec = (((current_temp_16 % 16) * 10) / 16) % 10;
 
-            char buf[9];
-            snprintf(buf, 9, "%d.%d", num, dec);
+            char buf[5];
+            snprintf(buf, 5, "%d.%d", num, dec);
             lcd_moveto(0, 7);
             lcd_stringout(buf);
 
@@ -251,25 +248,14 @@ int main()
                 update_servo(get_rounded_temp_F(current_temp_16));
             }
 
-            old_temp = current_temp_16;
+            old_temp_16 = current_temp_16;
+
+            // clear weird bug
+            lcd_moveto(0,11);
+            lcd_stringout("     ");
         }
     }
     return 0;
-}
-
-/**
- * Checks and adjusts (if necessary) bounds of threshold at location val
- */
-void check_bounds(volatile uint8_t *val)
-{
-    if (*val < 50)
-    {
-        *val = 50;
-    }
-    if (*val > 90)
-    {
-        *val = 90;
-    }
 }
 
 /**

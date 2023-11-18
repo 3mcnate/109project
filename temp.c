@@ -37,12 +37,27 @@ int get_temp_F_16(void)
  * @brief returns temperature rounded to the nearest integer
  * @param[in] temp temperature in Farenheit, times 16
  */
-uint8_t get_rounded_temp_F(int temp)
+int get_rounded_temp_F(int temp)
 {
-    uint8_t val = temp / 16;
+    int val = temp / 16;
     if (temp % 16 >= 8)
     {
         val++;
     }
     return val;
+}
+
+/**
+ * Checks and adjusts (if necessary) bounds of threshold at location val
+ */
+void check_bounds(volatile uint8_t *val)
+{
+    if (*val < 50)
+    {
+        *val = 50;
+    }
+    if (*val > 90)
+    {
+        *val = 90;
+    }
 }

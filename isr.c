@@ -8,6 +8,7 @@
 #include "ds18b20.h"
 #include "servo.h"
 #include "timer.h"
+#include "temp.h"
 
 extern volatile uint8_t new_state, old_state;
 extern volatile char encoder_changed; // Flag for state change
@@ -115,10 +116,14 @@ ISR(PCINT1_vect)
         // update values
         if (THRESHOLD_SELECT == LOW) {
             low_thresh += diff;
+            check_bounds(&low_thresh);
         }
         else {
             high_thresh += diff;
+            check_bounds(&high_thresh);
         }
+
+
 
         // update servo if needed
         if (timer1_running) {
